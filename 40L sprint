@@ -1,0 +1,151 @@
+
+
+import requests
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta, date
+
+
+def convert_time_to_seconds(time_str):
+    if ':' in time_str:
+        # Format: minutes:seconds.milliseconds
+        minutes_str, rest = time_str.split(':')
+        minutes = int(minutes_str)
+
+        if '.' in rest:
+            seconds_str, milliseconds_str = rest.split('.')
+        else:
+            seconds_str = rest
+            milliseconds_str = '0'
+
+        seconds = int(seconds_str)
+        milliseconds = int(milliseconds_str)
+    else:
+        # Format: seconds.milliseconds
+        minutes = 0
+        if '.' in time_str:
+            seconds_str, milliseconds_str = time_str.split('.')
+        else:
+            seconds_str = time_str
+            milliseconds_str = '0'
+
+        seconds = int(seconds_str)
+        milliseconds = int(milliseconds_str)
+
+    total_seconds = minutes * 60 + seconds + milliseconds / 1000  # Convert milliseconds to seconds
+    return total_seconds
+
+current_date = datetime.today()
+one_week_ago = datetime.today() - timedelta(days=7)
+
+Userprompt = input("Type in your JStris user name")
+url = "https://jstris.jezevec10.com/sprint?display=5&user=" + Userprompt
+response = requests.get(url)
+
+reference_after = "user="
+index = url.find(reference_after)
+Username = url[index + 5:]
+
+if response.status_code == 200:
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Find the table with the "Time" header
+    table = soup.find('table', {'class': 'table'})  # You may need to adjust the class attribute
+
+    if table:
+        times = []  # Create a list to store the "Time" data
+        blocks = []  # Create a list to store the data in the 3rd cell
+        PPS = []
+        finesse = []
+        date_strings = []
+        date_list = []  # Define date_list before the loop
+        # Iterate through table rows to extract data
+        rows = table.find_all('tr')
+        for row in rows:
+            cells = row.find_all('td')
+            if cells:
+                time = cells[2].text  # Assuming the "Time" is in the third cell (index 2)
+                block_cell_data = cells[3].text  # Data in the 4rd cell (index 3)
+                PPScelldata = cells[4].text
+                finesse_celldata = cells[5].text
+                date_data = cells[6].text
+
+                #Convert minutes to seconds
+                time_in_seconds = convert_time_to_seconds(time)
+
+                times.append(str(time_in_seconds))  # Add the "Time" data to the list
+                blocks.append(block_cell_data)  # Add the data in the 3rd cell to the list
+                PPS.append(PPScelldata)
+                finesse.append(finesse_celldata)
+                date_strings.append(date_data)
+
+                #covert date strings to datetime objects
+                date_list = [datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S") for date_str in date_strings]
+
+        # Convert the time strings to numerical values (assuming they represent times in seconds)
+        # You may need to parse the time strings differently if they are in a different format
+        times = [float(time.replace("s", "")) for time in times]
+        blocks = [float(data) for data in blocks]
+        PPS = [float(data) for data in PPS]
+        finesse = [float(data) for data in finesse]
+
+        # Create a scatter plot of time vs. blocks
+        plt.scatter(times, blocks)
+        plt.xlabel("Time (seconds)")
+        plt.ylabel("Number of blocks")
+        plt.title(Username + ": Time vs. Blocks")
+        plt.grid(True)
+        plt.show()
+
+        # Create a scatter plot of PPS vs finesse
+        plt.scatter(PPS, finesse)
+        plt.xlabel("Pieces Per Second")
+        plt.ylabel("Finesse")
+        plt.title(Username + ": PPS vs. Finesse")
+        plt.grid(True)
+        plt.show()
+
+        # Create a scatter plot of time vs PPS
+        plt.scatter(times, PPS)
+        plt.xlabel("Time (seconds)")
+        plt.ylabel("PPS")
+        plt.title(Username + ": Time vs PPS")
+        plt.grid(True)
+        plt.show()
+
+        #Histogram of block usage
+        plt.hist(blocks, bins=10)
+        plt.xlabel("# of Blocks Used")
+        plt.ylabel("Frequency")
+        plt.title(Username + ": Histogram of Block Usage")
+        plt.grid(True)
+        plt.show()
+
+        #Box and wisker for sprint times
+        plt.boxplot(times, vert=False)
+        plt.xlabel("Sprint Time")
+        plt.ylabel("")
+        plt.title(Username + ": Box plot of Sprint times")
+        plt.grid(True)
+        plt.show()
+
+
+        # Calculate the average time and the average data in the 3rd cell
+        if times and blocks and PPS and finesse and date:
+            average_time = sum(times) / len(times)
+            average_data = sum(blocks) / len(blocks)
+            averagePPS = sum(PPS) / len(PPS)
+            averagefinesse = sum(finesse) / len(finesse)
+            dates_last_week = [date for date in date_list if one_week_ago <= date <= current_date]
+            print("Average Time:", average_time)
+            print("Average number of blocks:", average_data)
+            print("Average PPS:", averagePPS)
+            print("Average Finesse:", averagefinesse)
+            print("# of top 200 times gotten in the last 7 days:", len(dates_last_week))
+        else:
+            print("No data found.")
+    else:
+        print("Table not found on the page.")
+else:
+    print("Request was not successful. Status code:", response.status_code)
+
